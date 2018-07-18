@@ -9,7 +9,7 @@ import operator as op
 from .scaling import nonDimensionalize as nd
 from .scaling import Dimensionalize
 from .scaling import UnitRegistry as u
-from ._swarm import Swarm
+from .Underworld_extended import Swarm
 from scipy import spatial
 
 class PressureSmoother(object):
@@ -436,7 +436,7 @@ class Nearest_neigbhors_projector(object):
         self.mesh_variable = mesh_variable
 
     def solve(self):
-        tree = spatial.KDTree(self.swarm.particleCoordinates.data)
+        tree = spatial.cKDTree(self.swarm.particleCoordinates.data)
         ids = tree.query(self.mesh.data)
         pts = self.swarm.particleCoordinates.data[ids, :]
         self.mesh_variable.data[...] = self.swarm_variable.evaluate(pts)
