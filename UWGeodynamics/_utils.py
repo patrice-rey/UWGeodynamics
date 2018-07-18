@@ -12,6 +12,7 @@ from .scaling import UnitRegistry as u
 from .Underworld_extended import Swarm
 from scipy import spatial
 
+
 class PressureSmoother(object):
 
     def __init__(self, mesh, pressureField):

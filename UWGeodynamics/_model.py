@@ -234,6 +234,7 @@ class Model(Material):
         self._buoyancyFn = None
         self.callback_post_solve = None
         self._initialize()
+        self.p = 1.0
 
     def _initialize(self):
 
@@ -306,6 +307,18 @@ class Model(Material):
     @outputDir.setter
     def outputDir(self, value):
         self._outputDir = value
+
+    def average(f):
+        def new_function(self):
+            p = self.p
+            newField = uw.mesh.MeshVariable(self.mesh.subMesh,
+                                            nodeDofCount=1,
+                                            dataType="double")
+            func = f(self)**(p)
+            projector = uw.utils.MeshVariable_Projection(newField, fn=func)
+            projector.solve()
+            return newField**(1.0 / p)
+        return new_function
 
     def restart(self, step=None, restartDir=None, badlands_prefix="outbdls",
                 badlands_step=None):
@@ -835,7 +848,7 @@ class Model(Material):
                                                nodeDofCount=count,
                                                dataType="double")
 
-        # Create a projector 
+        # Create a projector
         if name.startswith("_"):
             projector_name = name + "Projector"
         else:
@@ -864,6 +877,7 @@ class Model(Material):
         return newField
 
     @property
+    @average
     def _densityFn(self):
         densityMap = {}
         for material in self.materials:
@@ -912,6 +926,7 @@ class Model(Material):
         return self.frictionalBCs
 
     @property
+    @average
     def _viscosityFn(self):
         """ Create the Viscosity Function """
 
