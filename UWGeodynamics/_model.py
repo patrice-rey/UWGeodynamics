@@ -310,7 +310,7 @@ class Model(Material):
 
     def average(f):
         def new_function(self):
-            p = self.p
+            p = rcParams["averaging.method"]
             newField = uw.mesh.MeshVariable(self.mesh.subMesh,
                                             nodeDofCount=1,
                                             dataType="double")
