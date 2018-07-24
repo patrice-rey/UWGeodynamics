@@ -1,6 +1,7 @@
 from __future__ import print_function
 import os
 import json
+import sys
 import json_encoder
 from collections import Iterable
 from collections import OrderedDict
@@ -224,6 +225,15 @@ class Model(Material):
         # Mesh advector
         self._advector = None
 
+        # Create Mesh variable and projector for averaging scheme
+        self._averaged_field = uw.mesh.MeshVariable(
+            self.mesh.subMesh,
+            nodeDofCount=1,
+            dataType="double")
+        self._average_projector = uw.utils.MeshVariable_Projection(
+            self._averaged_field,
+            fn=1.0)
+
         # Initialise remaining attributes
         self._default_strain_rate = 1e-15 / u.second
         self._solution_exist = fn.misc.constant(False)
@@ -235,6 +245,7 @@ class Model(Material):
         self._buoyancyFn = None
         self.callback_post_solve = None
         self._initialize()
+        self.p = 1.0
 
     def _initialize(self):
 
@@ -307,6 +318,17 @@ class Model(Material):
     @outputDir.setter
     def outputDir(self, value):
         self._outputDir = value
+
+    def average(f):
+        def new_function(self):
+            p = rcParams["averaging.method"]
+            func = f(self)**(p)
+            projector = self._average_projector
+            projector.fn = func
+            projector.solve()
+            self._averaged_field.data[...] = self._averaged_field.data[...]**(1.0 / p)
+            return self._averaged_field
+        return new_function
 
     def restart(self, step=None, restartDir=None, badlands_prefix="outbdls",
                 badlands_step=None):
@@ -913,6 +935,7 @@ class Model(Material):
         return self.frictionalBCs
 
     @property
+    @average
     def _viscosityFn(self):
         """ Create the Viscosity Function """
 
@@ -1413,7 +1436,7 @@ class Model(Material):
 
             if uw.rank() == 0:
                 sys.__stdout__.write(
-                        """Non linear solver - Residual {2:.8e}; Tolerance {3:.8e}""".format(
+                        """Non linear solver - Residual {0:.8e}; Tolerance {1:.8e}""".format(
                             residual, self._curTolerance))
 
             converged = False
