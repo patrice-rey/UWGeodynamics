@@ -223,6 +223,15 @@ class Model(Material):
         # Mesh advector
         self._advector = None
 
+        # Create Mesh variable and projector for averaging scheme
+        self._averaged_field = uw.mesh.MeshVariable(
+            self.mesh.subMesh,
+            nodeDofCount=1,
+            dataType="double")
+        self._average_projector = uw.utils.MeshVariable_Projection(
+            self._averaged_field,
+            fn=1.0)
+
         # Initialise remaining attributes
         self._default_strain_rate = 1e-15 / u.second
         self._solution_exist = fn.misc.constant(False)
@@ -311,13 +320,11 @@ class Model(Material):
     def average(f):
         def new_function(self):
             p = rcParams["averaging.method"]
-            newField = uw.mesh.MeshVariable(self.mesh.subMesh,
-                                            nodeDofCount=1,
-                                            dataType="double")
             func = f(self)**(p)
-            projector = uw.utils.MeshVariable_Projection(newField, fn=func)
-            projector.solve()
-            return newField**(1.0 / p)
+            projector = self._average_projector
+            projector.fn = func
+            projector.solv()
+            return self._averaged_field**(1.0 / p)
         return new_function
 
     def restart(self, step=None, restartDir=None, badlands_prefix="outbdls",
@@ -877,7 +884,6 @@ class Model(Material):
         return newField
 
     @property
-    @average
     def _densityFn(self):
         densityMap = {}
         for material in self.materials:
@@ -926,9 +932,7 @@ class Model(Material):
         return self.frictionalBCs
 
     @property
-    @average
     def _viscosityFn(self):
-        """ Create the Viscosity Function """
 
         ViscosityMap = {}
         BGViscosityMap = {}
@@ -1130,6 +1134,11 @@ class Model(Material):
         else:
             self._isYielding = fn.misc.constant(0.0)
 
+        # Averaging Value
+        #p = rcParams["averaging.method"]
+        #self._average_projector.fn = viscosityFn**p
+        #self._average_projector.solve()
+        #viscosityFn = self._averaged_field**(1.0 / p)
         return Safe(viscosityFn)
 
     @property
