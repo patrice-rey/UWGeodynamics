@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+import sys
 import json
 import json_encoder
 from collections import Iterable
@@ -1304,36 +1305,6 @@ class Model(Material):
                                        fromObject=nodes)
 
     def solve(self):
-        """ Solve Stokes """
-
-        if self.step == 0:
-            self._curTolerance = rcParams["initial.nonlinear.tolerance"]
-            minIterations = rcParams["initial.nonlinear.min.iterations"]
-            maxIterations = rcParams["initial.nonlinear.max.iterations"]
-        else:
-            self._curTolerance = rcParams["nonlinear.tolerance"]
-            minIterations = rcParams["nonlinear.min.iterations"]
-            maxIterations = rcParams["nonlinear.max.iterations"]
-
-        if uw.__version__.split(".")[1] > 5:
-            # The minimum number of iteration only works with version 2.6
-            # 2.6 is still in development...
-            self.stokes_solver().solve(
-                nonLinearIterate=True,
-                nonLinearMinIterations=minIterations,
-                nonLinearMaxIterations=maxIterations,
-                callback_post_solve=self.callback_post_solve,
-                nonLinearTolerance=self._curTolerance)
-        else:
-            self.stokes_solver().solve(
-                nonLinearIterate=True,
-                nonLinearMaxIterations=maxIterations,
-                callback_post_solve=self.callback_post_solve,
-                nonLinearTolerance=self._curTolerance)
-
-        self._solution_exist.value = True
-
-    def _solve_tempo(self):
 
         solver = self.stokes_solver()
 
@@ -1373,29 +1344,6 @@ class Model(Material):
             self.stokes_solver().solve(nonLinearIterate=False)
             self._callback_post_solve()
 
-
-            ## Calculate L2-Norm of current velocity Field
-            #vdot = fn.math.dot(self.velocityField, self.velocityField)
-            #vint = uw.utils.Integral(vdot, self.mesh)
-            #vL2 = np.sqrt(vint.evaluate()[0])
-
-            ## Calculate L2-Norm of delta velocity
-            #dV = self.velocityField - self.prevVelocityField
-            #vdot = fn.math.dot(dV, dV)
-            #vint = uw.utils.Integral(vdot, self.mesh)
-            #dVL2 = np.sqrt(vint.evaluate()[0])
-
-            ## Calculate L2-Norm of current dynamic pressure
-            #pdot = fn.math.dot(self.pressureField, self.pressureField)
-            #pint = uw.utils.Integral(pdot, self.mesh)
-            #pL2 = np.sqrt(pint.evaluate()[0])
-
-            ## Calculate L2-Norm of delta pressure
-            #dP = self.pressureField - self.prevPressureField
-            #dPdot = fn.math.dot(dP, dP)
-            #pint = uw.utils.Integral(dPdot, self.mesh)
-            #dPL2 = np.sqrt(pint.evaluate()[0])
-
             # Full norm of the velocity and pressure
             xdot = (fn.math.dot(self.velocityField, self.velocityField) +
                     fn.math.dot(self.pressureField, self.pressureField))
@@ -1429,11 +1377,6 @@ class Model(Material):
                 if uw.rank() == 0:
                     sys.__stdout__.write(" - not converged - \n")
                     sys.__stdout__.flush()
-
-
-            #self.velocityField.data[...] *= (1.0 - rcParams["alpha"])
-            #self.velocityField.data[...] += rcParams["alpha"] * self.prevVelocityField.data[...]
-            #self.velocityField.syncronise()
 
             it += 1
 
@@ -1518,7 +1461,7 @@ class Model(Material):
 
             self.preSolveHook()
 
-            self._solve_tempo()
+            self.solve()
 
             # Whats the longest we can run before reaching the end
             # of the model or a checkpoint?
