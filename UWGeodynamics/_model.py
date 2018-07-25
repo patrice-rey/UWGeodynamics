@@ -227,12 +227,19 @@ class Model(Material):
         self._advector = None
 
         # Create Mesh variable and projector for averaging scheme
-        self._averaged_field = uw.mesh.MeshVariable(
+        self._averaged_viscosity_field = uw.mesh.MeshVariable(
             self.mesh.subMesh,
             nodeDofCount=1,
             dataType="double")
-        self._average_projector = uw.utils.MeshVariable_Projection(
-            self._averaged_field,
+        self._viscosity_projector = uw.utils.MeshVariable_Projection(
+            self._averaged_viscosity_field,
+            fn=1.0)
+        self._averaged_density_field = uw.mesh.MeshVariable(
+            self.mesh.subMesh,
+            nodeDofCount=1,
+            dataType="double")
+        self._density_projector = uw.utils.MeshVariable_Projection(
+            self._averaged_density_field,
             fn=1.0)
 
         # Initialise remaining attributes
@@ -319,17 +326,6 @@ class Model(Material):
     @outputDir.setter
     def outputDir(self, value):
         self._outputDir = value
-
-    def average(f):
-        def new_function(self):
-            p = rcParams["averaging.method"]
-            func = f(self)**(p)
-            projector = self._average_projector
-            projector.fn = func
-            projector.solve()
-            self._averaged_field.data[...] = self._averaged_field.data[...]**(1.0 / p)
-            return self._averaged_field
-        return new_function
 
     def restart(self, step=None, restartDir=None, badlands_prefix="outbdls",
                 badlands_step=None):
@@ -906,7 +902,14 @@ class Model(Material):
                 densityMap[material.index] = (
                     densityMap[material.index] * (1.0 - fact))
 
-        return fn.branching.map(fn_key=self.materialField, mapping=densityMap)
+        densityFn =  fn.branching.map(fn_key=self.materialField, mapping=densityMap)
+
+        p = rcParams["averaging.method"]
+        projector = self._density_projector
+        projector.fn = densityFn**(p)
+        projector.solve()
+        densityFn = self._averaged_density_field**(1.0 / p)
+        return densityFn
 
     def set_frictional_boundary(self, right=None, left=None,
                                 top=None, bottom=None, front=None,
@@ -936,7 +939,6 @@ class Model(Material):
         return self.frictionalBCs
 
     @property
-    @average
     def _viscosityFn(self):
         """ Create the Viscosity Function """
 
@@ -1140,6 +1142,12 @@ class Model(Material):
         else:
             self._isYielding = fn.misc.constant(0.0)
 
+        # Apply averaging method
+        p = rcParams["averaging.method"]
+        projector = self._viscosity_projector
+        projector.fn = viscosityFn**(p)
+        projector.solve()
+        viscosityFn = self._averaged_viscosity_field**(1.0 / p)
         return Safe(viscosityFn)
 
     @property
