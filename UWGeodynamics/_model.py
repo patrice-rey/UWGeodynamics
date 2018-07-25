@@ -253,6 +253,7 @@ class Model(Material):
         self._buoyancyFn = None
         self.callback_post_solve = None
         self._initialize()
+        self.nonlinear = False
         self.p = 1.0
 
     def _initialize(self):
@@ -904,6 +905,11 @@ class Model(Material):
 
         densityFn =  fn.branching.map(fn_key=self.materialField, mapping=densityMap)
 
+        # Check linearity
+        if ((self.velocityField in densityFn._underlyingDataItems) or
+           (self.pressureField in densityFn._underlyingDataItems)):
+            self.nonLinear = True
+
         p = rcParams["averaging.method"]
         projector = self._density_projector
         projector.fn = densityFn**(p)
@@ -1142,6 +1148,11 @@ class Model(Material):
         else:
             self._isYielding = fn.misc.constant(0.0)
 
+        # Check linearity
+        if ((self.velocityField in viscosityFn._underlyingDataItems) or
+           (self.pressureField in viscosityFn._underlyingDataItems)):
+            self.nonLinear = True
+
         # Apply averaging method
         p = rcParams["averaging.method"]
         projector = self._viscosity_projector
@@ -1340,20 +1351,9 @@ class Model(Material):
 
     def solve(self):
 
-        solver = self.stokes_solver()
-
-        if solver._check_linearity(False):
-            if self.step == 0:
-                self.add_mesh_field("prevVelocityField", nodeDofCount=self.mesh.dim)
-                self.add_submesh_field("prevPressureField", nodeDofCount=1)
-            self._nonLinearSolve()
-
-        else:
-            self.stokes_solver().solve()
-
-        return
-
-    def _nonLinearSolve(self):
+        if self.step == 0:
+            self.add_mesh_field("prevVelocityField", nodeDofCount=self.mesh.dim)
+            self.add_submesh_field("prevPressureField", nodeDofCount=1)
 
         if self.step == 0:
             self._curTolerance = rcParams["initial.nonlinear.tolerance"]
@@ -1364,9 +1364,14 @@ class Model(Material):
             minIterations = rcParams["nonlinear.min.iterations"]
             maxIterations = rcParams["nonlinear.max.iterations"]
 
+        self.nonLinear = False
+
         it = 0
         self.stokes_solver().solve(nonLinearIterate=False)
         it += 1
+
+        if not self.nonLinear:
+            return
 
         while it < maxIterations:
 
@@ -2055,7 +2060,6 @@ _html_global["Number of Elements"] = "elementRes"
 _html_global["length"] = "length"
 _html_global["width"] = "width"
 _html_global["height"] = "height"
-
 
 def _model_html_repr(Model):
     header = "<table>"
