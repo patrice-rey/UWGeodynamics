@@ -121,10 +121,10 @@ def validate_viscosity(s):
 
 def validate_averaging(s):
     options = {"arithmetic": 1,
-               "geometric": 0,
+               "geometric": 1e-6,
                "harmonic": -1,
-               "maximum": 30,
-               "minimum": -30,
+               "maximum": 5,
+               "minimum": -5,
                "root mean square": 2}
     if s not in options.keys():
         raise ValueError(
