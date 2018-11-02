@@ -4,7 +4,7 @@ MAINTAINER romain.beucher@unimelb.edu
 USER root
 
 WORKDIR /opt
-RUN git clone --depth 1 https://github.com/rbeucher/UWGeodynamics.git
+RUN git clone --depth 1 --branch python2 --single-branch https://github.com/rbeucher/UWGeodynamics.git
 RUN pip install -e /opt/UWGeodynamics
 
 RUN mkdir /workspace/UWGeodynamics
